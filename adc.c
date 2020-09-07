@@ -28,6 +28,7 @@ Altered source version
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "config.h"
 #include "adc.h"
 
 
@@ -69,8 +70,10 @@ void initAdcs(void)
 
 void disableAdcs(void)
 {
+#if !defined(ENABLE_NEOPIXELBUS) && !defined(ENABLE_FASTLED)
     TIMSK &= ~(1 << TOIE0);  // disable timer0 interrupts
     TCCR0 = 0x00;            // disable timer0
+#endif
 
     ADCSRA &= ~(1 << ADATE); // disable conversion auto trigger.
     ADCSRA &= ~(1 << ADEN);  // disable adcs
@@ -107,10 +110,12 @@ void hardInitAdcs(void)
     ADCSRA |= (1 << ADEN);  // enable adcs
     ADCSRA |= (1 << ADIE);  // enable adc interrupts
 
+#if !defined(ENABLE_NEOPIXELBUS) && !defined(ENABLE_FASTLED) // prescale is handled in init()
     TCCR0 = 0x04; // enable timer in normal mode.  prescale = /64
     TIMSK |= (1 << TOIE0);  // disable timer0 interrupts
     //TIMSK = (1 << OCIE0);
     //timer_enable_int(_BV(TOIE0));
+#endif
 }
 
 
@@ -222,7 +227,9 @@ void disableAdc(uint8 adc)
         disableAdcs();
 }
 
+#if !defined(ENABLE_NEOPIXELBUS) && !defined(ENABLE_FASTLED)
 EMPTY_INTERRUPT(TIMER0_OVF_vect);
+#endif
 
 ISR(ADC_vect)
 {
