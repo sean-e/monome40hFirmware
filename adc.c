@@ -27,17 +27,13 @@ Altered source version
 
 
 #include <avr/io.h>
-//#include <avr/signal.h>
 #include <avr/interrupt.h>
 #include "adc.h"
 
 
-#define adcFilterCheckBucketIndex(index)    if (index >= kAdcFilterNumBuckets) index = 0;
-#define checkAdcSelect()                    if (adcSelect >= kAdcFilterNumAdcs) adcSelect = 0;
-
 t_adc_filter gAdcFilters[kAdcFilterNumAdcs];
 static uint8 adcSelect = 0;
-uint8 gAdcEnableState = 0;
+static uint8 gAdcEnableState = 0;
 
 
 /***************************************************************************************************
@@ -132,14 +128,14 @@ void hardInitAdcs(void)
 
 void initAdcFilters(void)
 {
-    uint8 adc, bucket;
-
-    for (adc = 0; adc < kAdcFilterNumAdcs; adc++) {
+    for (uint8 adc = 0; adc < kAdcFilterNumAdcs; adc++) {
         gAdcFilters[adc].accum = 0;
         gAdcFilters[adc].value = 0;
         gAdcFilters[adc].index = 0;
+        gAdcFilters[adc].dirty = 0;
+        gAdcFilters[adc].last_value = 0;
 
-        for (bucket = 0; bucket < kAdcFilterNumBuckets; bucket++)
+        for (uint8 bucket = 0; bucket < kAdcFilterNumBuckets; bucket++)
             gAdcFilters[adc].bucket[bucket] = 0;
     }
 }
@@ -147,7 +143,7 @@ void initAdcFilters(void)
 
 /***************************************************************************************************
  *
- * DESCRIPTION: Adds a new frame to the adc accumulator and genereate a new value.  JAL
+ * DESCRIPTION: Adds a new frame to the adc accumulator and generate a new value.  JAL
  *
  * ARGUMENTS:   adc -   number of adc filter to be updated (0 = PORTA^0, 3 = PORTA^3).
  *              value - 10 bit conversion value (0 = GND, 1023 = AREF.   
@@ -160,10 +156,10 @@ void initAdcFilters(void)
        
 void adcAddNextValue(uint8 adc, uint16 value)
 {
-	if (!(gAdcEnableState & (1 << adc)))
-		return;
+    if (!(gAdcEnableState & (1 << adc)))
+        return;
 
-	t_adc_filter * curAdcFilter = &gAdcFilters[adc];
+    t_adc_filter *curAdcFilter = &gAdcFilters[adc];
     curAdcFilter->accum -= curAdcFilter->bucket[curAdcFilter->index];
     curAdcFilter->accum += value;
     curAdcFilter->bucket[curAdcFilter->index] = value;
@@ -171,10 +167,10 @@ void adcAddNextValue(uint8 adc, uint16 value)
     curAdcFilter->last_value = curAdcFilter->value;
     curAdcFilter->value = curAdcFilter->accum >> kAdcFilterRightShiftValue; // accum divided by kAdcFilterNumBuckets
     if (curAdcFilter->value != curAdcFilter->last_value)
-	    curAdcFilter->dirty = true;
+        curAdcFilter->dirty = true;
 
-    curAdcFilter->index++;
-	adcFilterCheckBucketIndex(curAdcFilter->index);
+    if (++curAdcFilter->index >= kAdcFilterNumBuckets) 
+        curAdcFilter->index = 0;
 }
 
 
@@ -226,19 +222,14 @@ void disableAdc(uint8 adc)
         disableAdcs();
 }
 
-EMPTY_INTERRUPT(SIG_OVERFLOW0);
+EMPTY_INTERRUPT(TIMER0_OVF_vect);
 
-SIGNAL(SIG_ADC)
+ISR(ADC_vect)
 {
-    uint16 value;
+    adcAddNextValue(adcSelect, (uint16)ADCL | (((uint16)ADCH) << 8));
 
-    value = (uint16)ADCL;
-    value |= (((uint16)ADCH) << 8);
-
-    adcAddNextValue(adcSelect, value);
-
-    adcSelect++;
-    checkAdcSelect();
+    if (++adcSelect >= kAdcFilterNumAdcs) 
+        adcSelect = 0;
 
     ADMUX &= 0xF0;
     ADMUX |= adcSelect & 0xF;
