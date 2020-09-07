@@ -1,3 +1,6 @@
 [submodule "submodules/NeoPixelBus"]
 	path = submodules/NeoPixelBus
 	url = https://github.com/sean-e/NeoPixelBus.git
+[submodule "submodules/ArduinoCore-avr"]
+	path = submodules/ArduinoCore-avr
+	url = https://github.com/sean-e/ArduinoCore-avr.git
