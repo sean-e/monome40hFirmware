@@ -34,13 +34,18 @@ Altered source version
 #define kAdcFilterNumBuckets      4 // 4 8 16
 #define kAdcFilterRightShiftValue 2 // 2 3 4
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct _adc_filter {
     uint16 bucket[kAdcFilterNumBuckets];  // ring buffer for storing adc frames
     uint16 accum;                         // sum of all adc frames in bucket
     uint8  index;                         // write index into bucket
-    uint16 value;                         // average of all values in bucket
+    volatile uint16 value;                // average of all values in bucket
     uint16 last_value;                    // last value (dirty only gets set if value != last_value)
-    uint8  dirty;                         // flag to indicate whether or not the adc value has changed and should be output
+    volatile uint8 dirty;                 // flag to indicate whether or not the adc value has changed and should be output
 } t_adc_filter;
 
 void initAdcs(void);   
@@ -53,6 +58,9 @@ void disableAdc(uint8 adc);
 
 
 extern t_adc_filter gAdcFilters[kAdcFilterNumAdcs];
-extern uint8 gAdcEnableState;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

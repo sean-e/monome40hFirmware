@@ -38,6 +38,11 @@
 #define kButtonNewEvent   1
 #define kButtonNoEvent    0
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 extern uint8 button_current[8],             // bitmap of physical button state (depressed or released)
              button_last[8],                // bitmap of physical button state last time buttons were read
              button_state[8],               // bitmap of debounced button state
@@ -47,5 +52,9 @@ extern uint8 button_current[8],             // bitmap of physical button state (
 void buttonInit(void);
 void buttonCheck(uint8 row, uint8 index);
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
