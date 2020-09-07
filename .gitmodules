@@ -1,0 +1,3 @@
+[submodule "submodules/NeoPixelBus"]
+	path = submodules/NeoPixelBus
+	url = https://github.com/sean-e/NeoPixelBus.git
