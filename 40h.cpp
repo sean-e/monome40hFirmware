@@ -19,50 +19,49 @@
  *  $Id: 40h.c,v. 1.1.1.1 2006/05/02 1:01:22
  */
 
-#define F_CPU 16000000UL
+// #define F_CPU 16000000UL // moved to project definition
 #include <util/delay.h>
 #include <avr/io.h>
-//#include <avr/signal.h>
 #include <avr/interrupt.h>
 #include <stdio.h>
 #include "message.h"
 #include "adc.h"
 #include "button.h"
 
-typedef struct {
+struct io_pin_t {
 	enum port_num { A, B, C, D } port;
 	uint8 pin;
-} io_pin_t;
+};
 
 inline void output_pin(io_pin_t iopin, bool state)    
 {
     if (state) {
         switch (iopin.port) {
-        case A:
+        case io_pin_t::A:
             PORTA |= (1 << iopin.pin);
             break;
-        case B:
+        case io_pin_t::B:
             PORTB |= (1 << iopin.pin);
             break;
-        case C:
+        case io_pin_t::C:
             PORTC |= (1 << iopin.pin);
             break;
-        case D:
+        case io_pin_t::D:
             PORTD |= (1 << iopin.pin);
             break;
         }
     } else {
         switch (iopin.port) {
-        case A:
+        case io_pin_t::A:
             PORTA &= ~(1 << iopin.pin);
             break;
-        case B:
+        case io_pin_t::B:
             PORTB &= ~(1 << iopin.pin);
             break;
-        case C:
+        case io_pin_t::C:
             PORTC &= ~(1 << iopin.pin);
             break;
-        case D:
+        case io_pin_t::D:
             PORTD &= ~(1 << iopin.pin);
             break;
         }
@@ -72,36 +71,35 @@ inline void output_pin(io_pin_t iopin, bool state)
 bool input_pin(io_pin_t pin)
 {
     switch (pin.port) {
-    case A:
+    case io_pin_t::A:
         return (PINA & (1 << pin.pin));                    
-    case B:
+    case io_pin_t::B:
         return (PINB & (1 << pin.pin));
-    case C:
+    case io_pin_t::C:
         return (PINC & (1 << pin.pin));
-    case D:
+    case io_pin_t::D:
         return (PIND & (1 << pin.pin));
     }
 
     return 0;
 }
 
+
 // #define DEBUG if you're going to debug over JTAG because we'll get caught in one of those
 // while loops otherwise.  I think the JTAG interface must share a pin with the SPI, but I
 // haven't confirmed this.  JAL 5/1/2006
 
-#ifndef DEBUG
 inline void spi_led(uint8 msb, uint8 lsb)
 {
+#if !defined(DEBUG)
     PORTB &= ~(1 << PB4);
     SPDR = msb;
     while (!(SPSR & (1 << SPIF)));
     SPDR = lsb;
     while (!(SPSR & (1 << SPIF)));
     PORTB |= (1 << PB4);
-}
-#else
-inline void spi_led { ; }
 #endif
+}
 
 int main(void)
 {
@@ -113,17 +111,18 @@ int main(void)
     t_message serial_in;
     t_message serial_out;
 
-    io_pin_t ioRXF; ioRXF.port = B; ioRXF.pin = 1;
-    io_pin_t ioRD; ioRD.port = B; ioRD.pin = 2;
-    io_pin_t ioWR; ioWR.port = B; ioWR.pin = 3;
+    io_pin_t ioRXF; ioRXF.port = io_pin_t::B; ioRXF.pin = 1;           // UMR245R RXF
+    io_pin_t ioRD; ioRD.port = io_pin_t::B; ioRD.pin = 2;              // UMR245R RD
+    io_pin_t ioWR; ioWR.port = io_pin_t::B; ioWR.pin = 3;              // UMR245R WR
 
-    io_pin_t ioPWREN; ioPWREN.port = C; ioPWREN.pin = 0;
+    io_pin_t ioPWREN; ioPWREN.port = io_pin_t::C; ioPWREN.pin = 0;     // UMR245R PWE#
 
-    io_pin_t ioLOAD; ioLOAD.port = C; ioLOAD.pin = 6;	       // 164 SH/LD
-    io_pin_t ioDATA; ioDATA.port = C; ioDATA.pin = 7;	       // 165 QH
-    io_pin_t ioCLKSEL; ioCLKSEL.port = A; ioCLKSEL.pin = 6;	   // 164 CLK
-    io_pin_t ioCLKIN; ioCLKIN.port = A; ioCLKIN.pin = 7;
-    io_pin_t ioSET; ioSET.port = A; ioSET.pin = 5;	           // 164 A
+    io_pin_t ioLOAD; ioLOAD.port = io_pin_t::C; ioLOAD.pin = 6;	       // 74LS165 SH/LD
+    io_pin_t ioDATA; ioDATA.port = io_pin_t::C; ioDATA.pin = 7;	       // 74LS165 QH
+
+    io_pin_t ioCLKSEL; ioCLKSEL.port = io_pin_t::A; ioCLKSEL.pin = 6;  // 74LS164 CLK
+    io_pin_t ioCLKIN; ioCLKIN.port = io_pin_t::A; ioCLKIN.pin = 7;     // 74LS165 CLK
+    io_pin_t ioSET; ioSET.port = io_pin_t::A; ioSET.pin = 5;           // 74LS164 A
 
     uint8 firstRun = true;
 
@@ -132,9 +131,9 @@ int main(void)
     DDRB |= (1 << ioWR.pin); PORTB |= (1 << ioWR.pin);
 
     DDRC &= ~(1 << ioPWREN.pin); PORTC |= (1 << ioPWREN.pin);
-
     DDRC |= (1 << ioLOAD.pin); PORTC |= (1 << ioLOAD.pin);
     DDRC &= ~(1 << ioDATA.pin); PORTC |= (1 << ioDATA.pin);
+
     DDRA |= (1 << ioCLKSEL.pin); PORTA |= (1 << ioCLKSEL.pin);
     DDRA |= (1 << ioCLKIN.pin); PORTA |= (1 << ioCLKIN.pin);
     DDRA |= (1 << ioSET.pin); PORTA |= (1 << ioSET.pin);
@@ -152,7 +151,7 @@ int main(void)
     rx_pos = 0;
     rx_roll = 0;
 
-    sei();
+    sei(); // for ADC
 
     // init SPI
     SPCR = (1 << SPE) | (1 << MSTR) | (SPI2X);
@@ -225,7 +224,6 @@ int main(void)
 
                     spi_led(i2 + 1, led_data[i2]);
                     break;
-
                 case kMessageTypeAdcEnable:
                     if (messageGetAdcEnableState(serial_in))
                         enableAdc(messageGetAdcEnablePort(serial_in));
@@ -277,13 +275,11 @@ int main(void)
 
                         spi_led(i3 + 1, led_data[i3]);
                     }
-
                     break;
                 }
             }
 
             output_pin(ioRD,1); 
-	    
         }
 
         // check if there's a stray single packet
@@ -304,15 +300,14 @@ int main(void)
         DDRD = 0xFF;
 
 
-        // button check proto
+        // process buttons
 
         output_pin(ioSET,0);
         for (i1 = 0; i1 < 8; i1++) {
             output_pin(ioCLKSEL, 1);
             output_pin(ioCLKSEL, 0);
             output_pin(ioSET, 1);
-            
-	
+
             button_last[i1] = button_current[i1];
 
             output_pin(ioLOAD, 0);		// set 165 to load
@@ -347,8 +342,8 @@ int main(void)
             }
         }
 
-        // ---------------------------------- ADC -------------------------
 
+        // process ADC
 
         for (i1 = 0; i1 < kAdcFilterNumAdcs; i1++) { 
             if (gAdcFilters[i1].dirty == true) {
