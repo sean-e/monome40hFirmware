@@ -24,13 +24,15 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <stdio.h>
+#include "config.h"
 #include "message.h"
 #include "adc.h"
 #include "button.h"
 
-struct io_pin_t {
-	enum port_num { A, B, C, D } port;
-	uint8 pin;
+struct io_pin_t 
+{
+    enum port_num { A, B, C, D } port;
+    uint8 pin;
 };
 
 inline void output_pin(io_pin_t iopin, bool state)    
@@ -85,10 +87,65 @@ bool input_pin(io_pin_t pin)
 }
 
 
+struct SerialInputData
+{
+    // for compatibility with t_message unpacking macros
+    uint8 data0 = 0;
+    uint8 data1 = 0;
+    uint8 readLen = 0;
+    uint8 rx_roll = 0;
+
+    void Read(uint8 b)
+    {
+        switch (readLen)
+        {
+        case 0:
+            data0 = b;
+            break;
+        case 1:
+            data1 = b;
+            break;
+        }
+        ++readLen;
+    }
+
+    bool PacketReady() 
+    {
+        if (!readLen)
+            return false;
+
+        const bool ret = readLen == 2;
+        if (ret)
+        {
+            // reset for read of next packet, current packet data still usable until next read
+            readLen = 0;
+            rx_roll = 0;
+        }
+
+        return ret;
+    }
+
+    void CheckRoll() 
+    {
+        if (!readLen)
+            return;
+
+        // if single packet is "lost" trash it after a chance to get a match
+        // CheckRoll is called outside of the inner RXF loop
+        if (++rx_roll > 80)
+        {
+            rx_roll = 0;
+            readLen = 0;
+        }
+    }
+};
+
+
 // #define DEBUG if you're going to debug over JTAG because we'll get caught in one of those
 // while loops otherwise.  I think the JTAG interface must share a pin with the SPI, but I
 // haven't confirmed this.  JAL 5/1/2006
 
+#if defined(ENABLE_LED_SPI)
 inline void spi_led(uint8 msb, uint8 lsb)
 {
 #if !defined(DEBUG)
@@ -100,37 +157,37 @@ inline void spi_led(uint8 msb, uint8 lsb)
     PORTB |= (1 << PB4);
 #endif
 }
+#endif
 
 int main(void)
 {
     uint8 i1, i2, i3;
-    uint8 rx0, rx1, rx_pos, rx_roll;
 
-    uint8 led_data[8];
-
-    t_message serial_in;
+    SerialInputData serial_in;
     t_message serial_out;
 
-    io_pin_t ioRXF; ioRXF.port = io_pin_t::B; ioRXF.pin = 1;           // UMR245R RXF
-    io_pin_t ioRD; ioRD.port = io_pin_t::B; ioRD.pin = 2;              // UMR245R RD
-    io_pin_t ioWR; ioWR.port = io_pin_t::B; ioWR.pin = 3;              // UMR245R WR
-
-    io_pin_t ioPWREN; ioPWREN.port = io_pin_t::C; ioPWREN.pin = 0;     // UMR245R PWE#
-
-    io_pin_t ioLOAD; ioLOAD.port = io_pin_t::C; ioLOAD.pin = 6;	       // 74LS165 SH/LD
-    io_pin_t ioDATA; ioDATA.port = io_pin_t::C; ioDATA.pin = 7;	       // 74LS165 QH
-
-    io_pin_t ioCLKSEL; ioCLKSEL.port = io_pin_t::A; ioCLKSEL.pin = 6;  // 74LS164 CLK
-    io_pin_t ioCLKIN; ioCLKIN.port = io_pin_t::A; ioCLKIN.pin = 7;     // 74LS165 CLK
-    io_pin_t ioSET; ioSET.port = io_pin_t::A; ioSET.pin = 5;           // 74LS164 A
-
+#if defined(ENABLE_LED_SPI)
+    uint8 led_data[8];
     uint8 firstRun = true;
+    io_pin_t ioPWREN{ io_pin_t::C, 0 };     // UMR245R PWE#
+    DDRC &= ~(1 << ioPWREN.pin); PORTC |= (1 << ioPWREN.pin);
+#endif
+
+    io_pin_t ioRXF{ io_pin_t::B, 1 };         // UMR245R RXF
+    io_pin_t ioRD{ io_pin_t::B, 2 };          // UMR245R RD
+    io_pin_t ioWR{ io_pin_t::B, 3 };          // UMR245R WR
+
+    io_pin_t ioLOAD{ io_pin_t::C, 6 };        // 74LS165 SH/LD
+    io_pin_t ioDATA{ io_pin_t::C, 7};         // 74LS165 QH
+
+    io_pin_t ioCLKSEL{ io_pin_t::A, 6 };      // 74LS164 CLK
+    io_pin_t ioCLKIN{ io_pin_t::A, 7 };       // 74LS165 CLK
+    io_pin_t ioSET{ io_pin_t::A, 5 };         // 74LS164 A
 
     DDRB &= ~(1 << ioRXF.pin); PORTB |= (1 << ioRXF.pin);
     DDRB |= (1 << ioRD.pin); PORTB |= (1 << ioRD.pin);
     DDRB |= (1 << ioWR.pin); PORTB |= (1 << ioWR.pin);
 
-    DDRC &= ~(1 << ioPWREN.pin); PORTC |= (1 << ioPWREN.pin);
     DDRC |= (1 << ioLOAD.pin); PORTC |= (1 << ioLOAD.pin);
     DDRC &= ~(1 << ioDATA.pin); PORTC |= (1 << ioDATA.pin);
 
@@ -138,92 +195,92 @@ int main(void)
     DDRA |= (1 << ioCLKIN.pin); PORTA |= (1 << ioCLKIN.pin);
     DDRA |= (1 << ioSET.pin); PORTA |= (1 << ioSET.pin);
 
-    output_pin(ioSET, 1);	             // clear out row selector
+    output_pin(ioSET, 1);                // clear out row selector
     for (i1 = 0; i1 < 8; i1++) {
+#if defined(ENABLE_LED_SPI)
         led_data[i1] = 0;
+#endif
         output_pin(ioCLKSEL, 1);         // clear out row selector
         output_pin(ioCLKSEL, 0);
     }
 
     buttonInit();
 
-    rx0 = 0;
-    rx_pos = 0;
-    rx_roll = 0;
-
     sei(); // for ADC
 
+#if defined(ENABLE_LED_SPI)
     // init SPI
     SPCR = (1 << SPE) | (1 << MSTR) | (SPI2X);
     DDRB |= (1 << PB5)|(1 << PB4)|(1 << PB7);
     
-    spi_led(11, 7);				       // set scan limit to full range
-    spi_led(10, 15);				   // set to max intensity
+    spi_led(11, 7);                    // set scan limit to full range
+    spi_led(10, 15);                   // set to max intensity
     for(i1 = 1; i1 < 9; i1++) {
-        spi_led(i1, i1);	           // print startup pattern 
+        spi_led(i1, i1);               // print startup pattern 
     }
-    spi_led(12, 1);				       // come out of shutdown mode 
-    spi_led(15, 0);				       // test mode off
+    spi_led(12, 1);                    // come out of shutdown mode 
+    spi_led(15, 0);                    // test mode off
    
     for(i1=0;i1<64;) {
-        spi_led(10, (64-i1)/4);				   // set to max intensity
-    	if(!input_pin(ioPWREN)) i1++;         // wait for USB enumeration, to prevent auto-sleep
-    	_delay_ms(8);
+        spi_led(10, (64-i1)/4);        // set to max intensity
+        if(!input_pin(ioPWREN)) i1++;  // wait for USB enumeration, to prevent auto-sleep
+        _delay_ms(8);
     }
 
     for(i1 = 1; i1 < 9; i1++) 
-        spi_led(i1, 0);	           // clear led data
+        spi_led(i1, 0);                // clear led data
  
-    spi_led(10, 15);				   // set to max intensity
+    spi_led(10, 15);                   // set to max intensity
+#endif
 
     // ******** main loop ********
-    while (1) {
-    	// read incoming serial **********************************************
-    	PORTD = 0;			          // setup PORTD for input
-        DDRD = 0;			          // input w/ tristate
+    while (1) 
+    {
+        // read incoming serial **********************************************
+        PORTD = 0;                      // setup PORTD for input
+        DDRD = 0;                       // input w/ tristate
 
-        while(!(input_pin(ioRXF))) {
+        while (!(input_pin(ioRXF))) 
+        {
             output_pin(ioRD, 0);
-            if (rx_pos == 0) {
-                rx0 = PIND;
-                rx_pos = 1;
-            }
-            else {
-                uint8 msg_type, msg_data0;
+            serial_in.Read(PIND);
+            output_pin(ioRD, 1);
+            if (serial_in.PacketReady())
+            {
+                uint8 msg_data0;
                 
-                rx1 = PIND;
-                rx_pos = 0;
-
-
-                // *********** process packet here 
-                serial_in.data0 = rx0;
-                serial_in.data1 = rx1;
+                // *********** process packet
                 
-                msg_type = messageGetType(serial_in);
-
-                switch (msg_type) {
+                const uint8 kMsgType = messageGetType(serial_in);
+                switch (kMsgType) {
                 case kMessageTypeLedTest:
                     msg_data0 = messageGetLedTestState(serial_in);
+#if defined(ENABLE_LED_SPI)
                     spi_led(15, msg_data0);
+#endif
                     break;
 
                 case kMessageTypeLedIntensity:
+#if defined(ENABLE_LED_SPI)
                     msg_data0 = messageGetLedIntensity(serial_in);
                     spi_led(10, msg_data0);
+#endif
                     break;
 
                 case kMessageTypeLedStateChange:
-
                     i1 = messageGetLedX(serial_in);
                     i2 = messageGetLedY(serial_in);
 
+#if defined(ENABLE_LED_SPI)
                     if(messageGetLedState(serial_in) == 0)
                         led_data[i2] &= ~(1 << i1);
                     else
                         led_data[i2] |= (1 << i1);
 
                     spi_led(i2 + 1, led_data[i2]);
+#endif
                     break;
+
                 case kMessageTypeAdcEnable:
                     if (messageGetAdcEnableState(serial_in))
                         enableAdc(messageGetAdcEnablePort(serial_in));
@@ -232,10 +289,13 @@ int main(void)
                     break;
 
                 case kMessageTypeShutdown:
+#if defined(ENABLE_LED_SPI)
                     msg_data0 = messageGetShutdownState(serial_in);
                     spi_led(12, msg_data0);
+#endif
                     break;
 
+#if defined(ENABLE_LED_SPI)
                 case kMessageTypeLedSetRow:
                     if (firstRun == true) {
                         for (i1 = 0; i1 < 8; i1++) {
@@ -276,27 +336,17 @@ int main(void)
                         spi_led(i3 + 1, led_data[i3]);
                     }
                     break;
+#endif
                 }
             }
-
-            output_pin(ioRD,1); 
         }
 
-        // check if there's a stray single packet
-        if (rx_pos == 1)
-            rx_roll++;
-        else
-            rx_roll = 0; 		// this can be moved to after the packet is processed
-	
-        // if single packet is "lost" trash it after a chance to get a match
-        if(rx_roll > 80) {
-            rx_roll = 0;
-            rx_pos = 0;
-        }
+        // called even if RXF has no data
+        serial_in.CheckRoll();
 
-	
+
         // output serial data **********************************************
-        PORTD = 0;			// setup PORTD for output
+        PORTD = 0;            // setup PORTD for output
         DDRD = 0xFF;
 
 
@@ -310,8 +360,8 @@ int main(void)
 
             button_last[i1] = button_current[i1];
 
-            output_pin(ioLOAD, 0);		// set 165 to load
-            output_pin(ioLOAD, 1);		// 165 shift
+            output_pin(ioLOAD, 0);        // set 165 to load
+            output_pin(ioLOAD, 1);        // 165 shift
 
             for (i2=0; i2 < 8; i2++) {
                 i3 = input_pin(ioDATA);
