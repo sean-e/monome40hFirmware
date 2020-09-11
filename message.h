@@ -45,6 +45,13 @@ typedef enum {
     kMessageTypeShutdown,
     kMessageTypeLedSetRow,
     kMessageTypeLedSetColumn,
+    kMessageTypeLedRgbOn,
+    kMessageTypeUpdatePresetGroup1,
+    kMessageTypeLedOnPresetGroup1,
+    kMessageTypeUpdatePresetGroup2,
+    kMessageTypeLedOnPresetGroup2,
+
+    // new message types should require two bytes for type
 
     kMessageNumTypes
 } eMessageTypes;
@@ -73,6 +80,7 @@ typedef struct {
 #define messageGetLedRowState(message)         (message.data1)
 #define messageGetLedColumnIndex(message)      (message.data0 & 0xF)
 #define messageGetLedColumnState(message)      (message.data1)
+#define messageGetLedColorPreset(message)      (message.data0 & 0xF)
 
 void messagePackButtonPress(t_message *message, uint8 state, uint8 x, uint8 y);
 void messagePackAdcVal(t_message *message, uint8 port, uint16 val);

@@ -29,6 +29,12 @@
 #include "adc.h"
 #include "button.h"
 
+#if defined(ENABLE_NEOPIXELBUS)
+#include <NeoPixelBus.h>
+#elif defined(ENABLE_FASTLED)
+#include <FastLED.h>
+#endif
+
 struct io_pin_t 
 {
     enum port_num { A, B, C, D } port;
@@ -86,14 +92,101 @@ bool input_pin(io_pin_t pin)
     return 0;
 }
 
+#if defined(ENABLE_FASTLED) || defined(ENABLE_NEOPIXELBUS)
+const uint16 kLedStripPixelCount = 30;
+const uint8 kLedStripDataPin = 5; // MCU pin 6 / PB5 -> Arduino D5
+// remove max7219 (it was used for SPI LEDs)
+// 3 wire strip connections:
+// data       from max7219 socket pin 1
+// ground     from max7219 socket pin 4
+// vcc        from max7219 socket pin 19 (opposite side of 1, count back from 24)
+#endif
+
+#if defined(ENABLE_NEOPIXELBUS)
+const RgbColor kOffColor{ 0 };
+constexpr uint8 kDimVal = 4;
+constexpr uint8 kPresetCount = 32;
+constexpr uint8 kPresetGroupSize = 16;
+RgbColor gColorPresets[kPresetCount]
+{
+    // Group 1 (2 groups so that slot numbers fit in 4 bits of message header)
+    { 0, 0, 0x3f },
+    { 0, 0x3f, 0 },
+    { 0x3f, 0, 0 },
+    { 0, 0x3f, 0x3f },
+    { 0x3f, 0x3f, 0 },
+    { 0x3f, 0, 0x3f },
+    { 0, 0, 0x7f },
+    { 0, 0x7f, 0 },
+    { 0x7f, 0, 0 },
+    { 0, 0x7f, 0x7f },
+    { 0x7f, 0x7f, 0 },
+    { 0x7f, 0, 0x7f },
+    { 0, 0, kDimVal },
+    { 0, kDimVal, 0 },
+    { kDimVal, 0, 0 },
+
+    // Group 2
+    { 0, 0, 0x1f },
+    { 0, 0x1f, 0 },
+    { 0x1f, 0, 0 },
+    { 0, 0x1f, 0x1f },
+    { 0x1f, 0x1f, 0 },
+    { 0x1f, 0, 0x1f },
+    { 0, 0, 0xf },
+    { 0, 0xf, 0 },
+    { 0xf, 0, 0 },
+    { 0, 0xf, 0xf },
+    { 0xf, 0xf, 0 },
+    { 0xf, 0, 0xf },
+    { 0, 0, kDimVal*2 },
+    { 0, kDimVal*2, 0 },
+    { kDimVal*2, 0, 0 }
+};
+
+constexpr uint8 kMatrixRows = 8;
+constexpr uint8 kMatrixCols = 8;
+constexpr uint8 kInvalidPixel = -1;
+// map of x/y coordinate to pixel strip ID (x == col, y == row)
+constexpr uint8 kLedMatrix[kMatrixRows][kMatrixCols] 
+{
+    {  0,  1,  2,  3,  4,  5,  6, 7},
+    {  8,  9, 10, 11, 12, 13, 14, 15},
+    { 16, 17, 18, 19, 20, 21, 22, 23 },
+    { 24, 25, 26, 27, 28, 29, kInvalidPixel, kInvalidPixel },
+//     { 32, 33, 34, 35, 36, 37, 38, 39 },
+//     { 40, 41, 42, 43, 44, 45, 46, 47 },
+//     { 48, 49, 50, 51, 52, 53, 54, 55 },
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }
+};
+
+using PixelStrip = NeoPixelBus<NeoRgbFeature, NeoAvr800KbpsMethod>;
+void RunPixelTest(PixelStrip &strip, uint8 pattern);
+#endif
 
 struct SerialInputData
 {
-    // for compatibility with t_message unpacking macros
+    // first two data bytes are not in the dataEx array for compatibility with t_message unpacking macros
     uint8 data0 = 0;
     uint8 data1 = 0;
+    uint8 dataEx[3]{0};
+    uint8 expectedLen = 0;
     uint8 readLen = 0;
     uint8 rx_roll = 0;
+
+    static uint8 GetExpectedMessageLen(uint8 msgHeader)
+    { 
+        switch (msgHeader >> 4)
+        {
+        case kMessageTypeUpdatePresetGroup1:     return 4;
+        case kMessageTypeUpdatePresetGroup2:     return 4;
+        case kMessageTypeLedRgbOn:               return 5;
+        default:                                 return 2;
+        }
+    }
 
     void Read(uint8 b)
     {
@@ -101,10 +194,14 @@ struct SerialInputData
         {
         case 0:
             data0 = b;
+            expectedLen = GetExpectedMessageLen(b);
             break;
         case 1:
             data1 = b;
             break;
+        default:
+            if (readLen > 1 && readLen < 5) // this condition should never fail...
+                dataEx[readLen - 2] = b;
         }
         ++readLen;
     }
@@ -114,7 +211,7 @@ struct SerialInputData
         if (!readLen)
             return false;
 
-        const bool ret = readLen == 2;
+        const bool ret = readLen == expectedLen;
         if (ret)
         {
             // reset for read of next packet, current packet data still usable until next read
@@ -171,6 +268,8 @@ int main(void)
     uint8 firstRun = true;
     io_pin_t ioPWREN{ io_pin_t::C, 0 };     // UMR245R PWE#
     DDRC &= ~(1 << ioPWREN.pin); PORTC |= (1 << ioPWREN.pin);
+#elif defined(ENABLE_FASTLED)
+    CRGB led_data[kLedStripPixelCount];
 #endif
 
     io_pin_t ioRXF{ io_pin_t::B, 1 };         // UMR245R RXF
@@ -206,7 +305,11 @@ int main(void)
 
     buttonInit();
 
+#if defined(ENABLE_NEOPIXELBUS) || defined(ENABLE_FASTLED)
+    init(); // for timer0 init, also calls sei() -- modified version of default Arduino code
+#else
     sei(); // for ADC
+#endif
 
 #if defined(ENABLE_LED_SPI)
     // init SPI
@@ -231,6 +334,24 @@ int main(void)
         spi_led(i1, 0);                // clear led data
  
     spi_led(10, 15);                   // set to max intensity
+#elif defined(ENABLE_NEOPIXELBUS)
+    PixelStrip strip(kLedStripPixelCount, kLedStripDataPin);
+    strip.Begin();
+    RunPixelTest(strip, 10);
+#elif defined(ENABLE_FASTLED)
+    for (i1 = 0; i1 < kLedStripPixelCount; i1++)
+        led_data[i1] = CRGB::Black;
+    FastLED.addLeds<NEOPIXEL, kLedStripDataPin>(led_data, kLedStripPixelCount);
+
+    for (i1 = 0; i1 < (int)kLedStripPixelCount; ++i1)
+        led_data[i1] = CRGB::Blue;
+    FastLED.show(); 
+    delay(2000);
+
+    for (i1 = 0; i1 < (int)kLedStripPixelCount; ++i1)
+        led_data[i1] = CRGB::Black;
+    FastLED.Show();
+    delay(2000);
 #endif
 
     // ******** main loop ********
@@ -257,6 +378,8 @@ int main(void)
                     msg_data0 = messageGetLedTestState(serial_in);
 #if defined(ENABLE_LED_SPI)
                     spi_led(15, msg_data0);
+#elif defined(ENABLE_NEOPIXELBUS)
+                    RunPixelTest(strip, msg_data0);
 #endif
                     break;
 
@@ -264,6 +387,8 @@ int main(void)
 #if defined(ENABLE_LED_SPI)
                     msg_data0 = messageGetLedIntensity(serial_in);
                     spi_led(10, msg_data0);
+#elif defined(ENABLE_NEOPIXELBUS)
+                    // not supported
 #endif
                     break;
 
@@ -278,8 +403,53 @@ int main(void)
                         led_data[i2] |= (1 << i1);
 
                     spi_led(i2 + 1, led_data[i2]);
+#elif defined(ENABLE_NEOPIXELBUS)
+                    if (i2 < kMatrixRows && i1 < kMatrixCols)
+                    {
+                        if(messageGetLedState(serial_in) == 0)
+                            strip.SetPixelColor(kLedMatrix[i2][i1], kOffColor);
+                        else
+                            strip.SetPixelColor(kLedMatrix[i2][i1], gColorPresets[0]);
+                    }
+#elif defined(ENABLE_FASTLED)
+                    if(messageGetLedState(serial_in) == 0)
+                        led_data[(i2 * 8) + i1] = CRGB::Black;
+                    else
+                        led_data[(i2 * 8) + i1] = CRGB::Blue;
 #endif
                     break;
+
+#if defined(ENABLE_NEOPIXELBUS)
+                case kMessageTypeLedRgbOn:
+                    i1 = messageGetLedX(serial_in);
+                    i2 = messageGetLedY(serial_in);
+
+                    if (i2 < kMatrixRows && i1 < kMatrixCols)
+                        strip.SetPixelColor(kLedMatrix[i2][i1], RgbColor{serial_in.dataEx[0], serial_in.dataEx[1], serial_in.dataEx[2]});
+                    break;
+
+                case kMessageTypeLedOnPresetGroup1:
+                case kMessageTypeLedOnPresetGroup2:
+                    i1 = messageGetLedX(serial_in);
+                    i2 = messageGetLedY(serial_in);
+                    i3 = messageGetLedColorPreset(serial_in);
+                    if (kMessageTypeLedOnPresetGroup2 == kMsgType)
+                        i3 += kPresetGroupSize;
+
+                    if (i3 < kPresetCount && i2 < kMatrixRows && i1 < kMatrixCols)
+                        strip.SetPixelColor(kLedMatrix[i2][i1], gColorPresets[i3]);
+                    break;
+
+                case kMessageTypeUpdatePresetGroup1:
+                case kMessageTypeUpdatePresetGroup2:
+                    i1 = messageGetLedColorPreset(serial_in);
+                    if (kMessageTypeUpdatePresetGroup2 == kMsgType)
+                        i1 += kPresetGroupSize;
+
+                    if (i1 < kPresetCount)
+                        gColorPresets[i1] = RgbColor{serial_in.data1, serial_in.dataEx[0], serial_in.dataEx[1]};
+                    break;
+#endif
 
                 case kMessageTypeAdcEnable:
                     if (messageGetAdcEnableState(serial_in))
@@ -292,6 +462,15 @@ int main(void)
 #if defined(ENABLE_LED_SPI)
                     msg_data0 = messageGetShutdownState(serial_in);
                     spi_led(12, msg_data0);
+#elif defined(ENABLE_NEOPIXELBUS)
+                    strip.ClearTo(kOffColor);
+                    strip.Show();
+                    delay(500);
+#elif defined(ENABLE_FASTLED)
+                    for (i1 = 0; i1 < kLedStripPixelCount; ++i1)
+                        led_data[i1] = CRGB::Black;
+                    FastLED.show();
+                    delay(500);
 #endif
                     break;
 
@@ -336,6 +515,34 @@ int main(void)
                         spi_led(i3 + 1, led_data[i3]);
                     }
                     break;
+#elif defined(ENABLE_NEOPIXELBUS)
+                case kMessageTypeLedSetRow:
+                    i1 = (messageGetLedRowIndex(serial_in) & 0x7);
+                    i2 = messageGetLedRowState(serial_in);
+
+                    if (i1 < kMatrixRows)
+                    {
+                        for (i3 = 0; i3 < kMatrixCols; ++i3)
+                        {
+                            strip.SetPixelColor(kLedMatrix[i1][i3], (i2 & 0x1) ? gColorPresets[0] : kOffColor);
+                            i2 >>= 1;
+                        }
+                    }
+                    break;
+
+                case kMessageTypeLedSetColumn:
+                    i1 = (messageGetLedColumnIndex(serial_in) & 0x7);
+                    i2 = messageGetLedColumnState(serial_in);
+
+                    if (i1 < kMatrixCols)
+                    {
+                        for (i3 = 0; i3 < kMatrixRows; ++i3)
+                        {
+                            strip.SetPixelColor(kLedMatrix[i3][i1], (i2 & 0x1) ? gColorPresets[0] : kOffColor);
+                            i2 >>= 1;
+                        }
+                    }
+                    break;
 #endif
                 }
             }
@@ -343,6 +550,12 @@ int main(void)
 
         // called even if RXF has no data
         serial_in.CheckRoll();
+
+#if defined(ENABLE_NEOPIXELBUS)
+        strip.Show();
+#elif defined(ENABLE_FASTLED)
+        FastLED.show();
+#endif
 
 
         // output serial data **********************************************
@@ -414,3 +627,121 @@ int main(void)
     
     return 0;
 }
+
+#if defined(ENABLE_NEOPIXELBUS)
+void
+// recognized pattern values are:
+//   10 : single RGB colors by row
+//   11 : single RGB colors by row then by col
+//   12 : test alternating high / dim values
+//   13 : show preset slot colors
+RunPixelTest(PixelStrip &strip, uint8 pattern)
+{
+    strip.ClearTo(kOffColor);
+
+    if (10 == pattern || 11 == pattern)
+    {
+        const uint8 hiVal = 64;
+        for (uint8 i0 = 0; i0 < (11 == pattern ? 2 : 1); ++i0) // once by rows, once by columns
+        {
+            for (uint8 i2 = 0; i2 < 3; ++i2) // iterate over each of the 3 color elements
+            {
+                uint8 r1 = 0, g1 = 0, b1 = 0;
+                switch (i2)
+                {
+                    case 0:
+                    r1 = hiVal;
+                    break;
+                    case 1:
+                    g1 = hiVal;
+                    break;
+                    case 2:
+                    b1 = hiVal;
+                    break;
+                }
+
+                for (uint8 i1 = 0; i1 < kMatrixRows; ++i1)
+                {
+                    bool changed = false;
+                    for (uint8 i3 = 0; i3 < kMatrixCols; ++i3)
+                    {
+                        const uint8 pixelId = (i0 == 0) ? kLedMatrix[i1][i3] : kLedMatrix[i3][i1];
+                        if (kInvalidPixel != pixelId && pixelId < strip.PixelCount())
+                        {
+                            strip.SetPixelColor(pixelId, RgbColor{r1, g1, b1});
+                            changed = true;
+                        }
+                    }
+
+                    if (changed)
+                    {
+                        strip.Show();
+                        delay(500);
+                        strip.ClearTo(kOffColor);
+                    }
+                }
+            }
+        }
+    }
+    else if (12 == pattern)
+    {
+        // test various hi vals compared to  dim val
+        for (uint8 i0 = 0; i0 < 5; ++i0)
+        {
+            strip.ClearTo(kOffColor);
+            const uint8 hiVals[]{ 128, 64, 32, 16 };
+            for (uint8 i2 = 0; i2 < 3; ++i2) // iterate over each of the 3 color elements
+            {
+                uint8 r1 = 0, r2 = 0, g1 = 0, g2 = 0, b1 = 0, b2 = 0;
+                for (const auto& hiVal : hiVals) // iterate over the hivals
+                {
+                    switch (i2)
+                    {
+                        case 0:
+                        b1 = hiVal;
+                        b2 = kDimVal;
+                        break;
+                        case 1:
+                        g1 = hiVal;
+                        g2 = kDimVal;
+                        break;
+                        case 2:
+                        r1 = hiVal;
+                        r2 = kDimVal;
+                        break;
+                    }
+
+                    // hiVal - dimVal (repeat)
+                    for (uint8 i3 = 0; i3 < (int)kLedStripPixelCount; i3 += 2)
+                        strip.SetPixelColor(i3, RgbColor{r1, g1, b1});
+                    for (uint8 i3 = 1; i3 < (int)kLedStripPixelCount; i3 += 2)
+                        strip.SetPixelColor(i3, RgbColor{r2, g2, b2});
+                    strip.Show();
+                    delay(2000);
+                }
+            }
+        }
+    }
+    else if (13 == pattern)
+    {
+        // display the preset slots
+        uint8 slot = 0;
+        for (uint8 i1 = 0; i1 < kMatrixRows; ++i1)
+        {
+            for (uint8 i2 = 0; i2 < kMatrixCols && slot < kPresetCount; ++i2)
+            {
+                const uint8 pixelId = kLedMatrix[i1][i2];
+                if (kInvalidPixel != pixelId)
+                    strip.SetPixelColor(pixelId, gColorPresets[slot++]);
+            }
+        }
+
+        strip.Show();
+		// leave displayed for user to clear
+		return;
+    }
+
+    strip.Show();
+    delay(250);
+}
+#endif

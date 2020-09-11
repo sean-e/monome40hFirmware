@@ -2,10 +2,10 @@
 #define __CONFIG_H__
 
 // define ENABLE_LED_SPI to use original monome SPI LED logic
-#define ENABLE_LED_SPI // is this is defined, don't compile with arduinocore
+//#define ENABLE_LED_SPI // is this is defined, don't compile with arduinocore
 
 // define ENABLE_NEOPIXELBUS to use arduino neopixel logic
-// #define ENABLE_NEOPIXELBUS
+#define ENABLE_NEOPIXELBUS
 
 // define ENABLE_FASTLED to use arduino fastled -- not completed because I got NeoPixelBus to work
 //#define ENABLE_FASTLED

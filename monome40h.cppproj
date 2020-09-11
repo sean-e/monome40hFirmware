@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectVersion>7.0</ProjectVersion>
     <ToolchainName>com.Atmel.AVRGCC8.CPP</ToolchainName>
-    <ProjectGuid>{8B22A687-C918-4BE4-B9C2-077BBDA6DA45}</ProjectGuid>
+    <ProjectGuid>{8b22a687-c918-4be4-b9c2-077bbda6da45}</ProjectGuid>
     <avrdevice>ATmega32</avrdevice>
     <avrdeviceseries>none</avrdeviceseries>
     <OutputType>Executable</OutputType>
@@ -56,11 +56,16 @@
           <ListValues>
             <Value>NDEBUG</Value>
             <Value>F_CPU=16000000UL</Value>
+            <Value>ARDUINO_ARCH_MEGAAVR</Value>
           </ListValues>
         </avrgcc.compiler.symbols.DefSymbols>
         <avrgcc.compiler.directories.IncludePaths>
           <ListValues>
             <Value>%24(PackRepoDir)\atmel\ATmega_DFP\1.3.300\include</Value>
+            <Value>../submodules/NeoPixelBus/src</Value>
+            <Value>../submodules/ArduinoCore-avr/cores/arduino</Value>
+            <Value>../submodules/ArduinoCore-avr/libraries/SPI/src</Value>
+            <Value>../submodules/ArduinoCore-avr/variants/mega32/mega32</Value>
           </ListValues>
         </avrgcc.compiler.directories.IncludePaths>
         <avrgcc.compiler.optimization.level>Optimize for size (-Os)</avrgcc.compiler.optimization.level>
@@ -73,11 +78,16 @@
           <ListValues>
             <Value>NDEBUG</Value>
             <Value>F_CPU=16000000UL</Value>
+            <Value>ARDUINO_ARCH_MEGAAVR</Value>
           </ListValues>
         </avrgcccpp.compiler.symbols.DefSymbols>
         <avrgcccpp.compiler.directories.IncludePaths>
           <ListValues>
             <Value>%24(PackRepoDir)\atmel\ATmega_DFP\1.3.300\include</Value>
+            <Value>../submodules/NeoPixelBus/src</Value>
+            <Value>../submodules/ArduinoCore-avr/cores/arduino</Value>
+            <Value>../submodules/ArduinoCore-avr/libraries/SPI/src</Value>
+            <Value>../submodules/ArduinoCore-avr/variants/mega32/mega32</Value>
           </ListValues>
         </avrgcccpp.compiler.directories.IncludePaths>
         <avrgcccpp.compiler.optimization.level>Optimize for size (-Os)</avrgcccpp.compiler.optimization.level>
@@ -113,11 +123,16 @@
           <ListValues>
             <Value>DEBUG</Value>
             <Value>F_CPU=16000000UL</Value>
+            <Value>ARDUINO_ARCH_MEGAAVR</Value>
           </ListValues>
         </avrgcc.compiler.symbols.DefSymbols>
         <avrgcc.compiler.directories.IncludePaths>
           <ListValues>
             <Value>%24(PackRepoDir)\atmel\ATmega_DFP\1.3.300\include</Value>
+            <Value>../submodules/NeoPixelBus/src</Value>
+            <Value>../submodules/ArduinoCore-avr/cores/arduino</Value>
+            <Value>../submodules/ArduinoCore-avr/libraries/SPI/src</Value>
+            <Value>../submodules/ArduinoCore-avr/variants/mega32/mega32</Value>
           </ListValues>
         </avrgcc.compiler.directories.IncludePaths>
         <avrgcc.compiler.optimization.level>Optimize (-O1)</avrgcc.compiler.optimization.level>
@@ -131,11 +146,16 @@
           <ListValues>
             <Value>DEBUG</Value>
             <Value>F_CPU=16000000UL</Value>
+            <Value>ARDUINO_ARCH_MEGAAVR</Value>
           </ListValues>
         </avrgcccpp.compiler.symbols.DefSymbols>
         <avrgcccpp.compiler.directories.IncludePaths>
           <ListValues>
             <Value>%24(PackRepoDir)\atmel\ATmega_DFP\1.3.300\include</Value>
+            <Value>../submodules/NeoPixelBus/src</Value>
+            <Value>../submodules/ArduinoCore-avr/cores/arduino</Value>
+            <Value>../submodules/ArduinoCore-avr/libraries/SPI/src</Value>
+            <Value>../submodules/ArduinoCore-avr/variants/mega32/mega32</Value>
           </ListValues>
         </avrgcccpp.compiler.directories.IncludePaths>
         <avrgcccpp.compiler.optimization.level>Optimize (-O1)</avrgcccpp.compiler.optimization.level>
@@ -174,15 +194,72 @@
     <Compile Include="button.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="config.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="message.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="message.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="submodules\ArduinoCore-avr\cores\arduino\hooks.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\ArduinoCore-avr\cores\arduino\wiring.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\ArduinoCore-avr\cores\arduino\wiring_digital.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\HsbColor.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\HslColor.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\HtmlColor.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\HtmlColorNames.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\HtmlColorNameStrings.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\HtmlColorShortNames.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\NeoGamma.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\NeoPixelAvr.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\RgbColor.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\RgbwColor.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="submodules\NeoPixelBus\src\internal\SegmentDigit.cpp">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="types.h">
       <SubType>compile</SubType>
     </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="submodules\" />
+    <Folder Include="submodules\ArduinoCore-avr\" />
+    <Folder Include="submodules\ArduinoCore-avr\cores\" />
+    <Folder Include="submodules\ArduinoCore-avr\cores\arduino\" />
+    <Folder Include="submodules\ArduinoCore-avr\variants\" />
+    <Folder Include="submodules\ArduinoCore-avr\variants\mega32\" />
+    <Folder Include="submodules\ArduinoCore-avr\variants\mega32\mega32\" />
+    <Folder Include="submodules\NeoPixelBus\" />
+    <Folder Include="submodules\NeoPixelBus\src\" />
+    <Folder Include="submodules\NeoPixelBus\src\internal\" />
   </ItemGroup>
   <Import Project="$(AVRSTUDIO_EXE_PATH)\\Vs\\Compiler.targets" />
 </Project>
