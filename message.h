@@ -38,18 +38,18 @@ extern "C"
 typedef enum {
     kMessageTypeButtonPress = 0,
     kMessageTypeAdcVal,
-    kMessageTypeLedStateChange,
+    kMessageTypeLedStateChange,               // uses preset color slot 0
     kMessageTypeLedIntensity,
-    kMessageTypeLedTest,
+    kMessageTypeLedTest,                      // 4 test pattern values: 10, 11, 12, 13 (see RunPixelTest)
     kMessageTypeAdcEnable,
     kMessageTypeShutdown,
-    kMessageTypeLedSetRow,
-    kMessageTypeLedSetColumn,
-    kMessageTypeLedRgbOn,
-    kMessageTypeUpdatePresetGroup1,
-    kMessageTypeLedOnPresetGroup1,
-    kMessageTypeUpdatePresetGroup2,
-    kMessageTypeLedOnPresetGroup2,
+    kMessageTypeLedSetRow,                    // uses preset color slot 0
+    kMessageTypeLedSetColumn,                 // uses preset color slot 0
+    kMessageTypeLedRgbOn,                     // enable LED using specified RGB value
+    kMessageTypeUpdatePresetGroup1,           // set preset color slot to specified RGB value (for slots 0 - 15)
+    kMessageTypeLedOnPresetGroup1,            // enable LED using RGB color slot 0-15
+    kMessageTypeUpdatePresetGroup2,           // set preset color slot to specified RGB value (slots 16 - 31 specified as 0 -15)
+    kMessageTypeLedOnPresetGroup2,            // enable LED using RGB color slot 16-31 (specified as 0 - 15)
 
     // new message types should require two bytes for type
 
