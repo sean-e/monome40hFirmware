@@ -8,6 +8,7 @@ The submodules directory references https://github.com/sean-e/NeoPixelBus and ht
 ## How is this different than the original 40h firmware?
 - Improved ADC handling for use with expression pedals (2007)
 - Support for RGB 3-wire NeoPixel LEDs (2020)
+- Updated serial protocol for RGB LED support (2020)
 
 ## To Use RGB 3-wire NeoPixel LEDs
 - in 40h.cpp, set `kLedStripPixelCount` to the number of LEDs to be used (max 40h)
@@ -17,3 +18,24 @@ The submodules directory references https://github.com/sean-e/NeoPixelBus and ht
 - Add a jumper between NeoPixel data in and pin 1 of the former MAX7219 socket
 - Add a jumper between NeoPixel ground and pin 4 of the former MAX7219 socket
 - Add a jumper between NeoPixel vcc and pin 19 of the former MAX7219 socket (opposite of pin 1, count back from 24)
+
+## Updated Serial Protocol
+(There are 32 preset color slots which can be changed at runtime.)
+
+This command no longer has any effect:
+- kMessageTypeLedIntensity
+
+These commands work as before with the color of the LED taken from preset slot 0:
+- kMessageTypeLedStateChange
+- kMessageTypeLedSetRow
+- kMessageTypeLedSetColumn
+
+This command now accepts a parameter that specifies a particular test pattern:
+- kMessageTypeLedTest                      // 4 test pattern values: 10, 11, 12, 13 (see RunPixelTest in 40h.cpp)
+
+These are new commands:
+- kMessageTypeLedRgbOn                     // enable LED using specified RGB value
+- kMessageTypeUpdatePresetGroup1           // set preset color slot to specified RGB value (for slots 0 - 15)
+- kMessageTypeLedOnPresetGroup1            // enable LED using preset color slot 0-15
+- kMessageTypeUpdatePresetGroup2           // set preset color slot to specified RGB value (slots 16 - 31 specified as 0 - 15)
+- kMessageTypeLedOnPresetGroup2            // enable LED using preset color slot 16-31 (specified as 0 - 15)
