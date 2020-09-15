@@ -3,14 +3,19 @@ This repro originated from https://github.com/sean-e/mTroll/tree/master/Monome40
 
 The original monome 40h source was not hosted at GitHub until a few years ago -- see https://github.com/monome/40h/ 
 
+monome info: 
+- https://monome.org/docs/grid/kits/40h-kit/
+- https://web.archive.org/web/20130820105410/http://monome.org/docs/tech:kits:40h_kit 
+- https://web.archive.org/web/20131023193104/http://monome.org/docs/tech:kits:kit_assembly
+
 The submodules directory references https://github.com/sean-e/NeoPixelBus and https://github.com/sean-e/ArduinoCore-avr, which are forks of repos modified for use on the monome board (dependent on NeoPixelBus for use of NeoPixel LED strips, while NeoPixelBus is dependent upon ArduinoCore, though I'm using AtmelStudio and not the Arduino IDE to compile).  Pull the submodules via `git submodule update --init --recursive`
 
 ## How is this different than the original 40h firmware?
 - Improved ADC handling for use with expression pedals (2007)
-- Support for RGB 3-wire NeoPixel LEDs (2020)
+- Support for 3-wire RGB NeoPixel LEDs (2020)
 - Updated serial protocol for RGB LED support (2020)
 
-## To Use RGB 3-wire NeoPixel LEDs
+## To Use 3-wire RGB NeoPixel LEDs
 - in 40h.cpp, set `kLedStripPixelCount` to the number of LEDs to be used (max 40h)
 - in 40h.cpp, update `kLedMatrix` for your matrix (keep the matrix 8x8, but assign the value `kInvalidPixel` to any position that should be considered empty; in general, the non-invalid values should be in order matching the LED strip order and should not repeat)
 - Remove the MAX7219 IC from the socket on the monome board
