@@ -125,6 +125,7 @@ RgbColor gColorPresets[kPresetCount]
     { 0, 0, kDimVal },
     { 0, kDimVal, 0 },
     { kDimVal, 0, 0 },
+    { kDimVal, 0, kDimVal },
 
     // Group 2
     { 0, 0, 0x1f },
@@ -141,7 +142,8 @@ RgbColor gColorPresets[kPresetCount]
     { 0xf, 0, 0xf },
     { 0, 0, kDimVal*2 },
     { 0, kDimVal*2, 0 },
-    { kDimVal*2, 0, 0 }
+    { kDimVal*2, 0, 0 },
+    { kDimVal*2, 0, kDimVal*2 }
 };
 
 constexpr uint8 kMatrixRows = 8;
