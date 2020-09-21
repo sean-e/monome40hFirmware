@@ -93,7 +93,7 @@ bool input_pin(io_pin_t pin)
 }
 
 #if defined(ENABLE_FASTLED) || defined(ENABLE_NEOPIXELBUS)
-const uint16 kLedStripPixelCount = 30;
+const uint16 kLedStripPixelCount = 25;
 const uint8 kLedStripDataPin = 5; // MCU pin 6 / PB5 -> Arduino D5
 // remove max7219 (it was used for SPI LEDs)
 // 3 wire strip connections:
@@ -151,14 +151,14 @@ constexpr uint8 kInvalidPixel = -1;
 constexpr uint8 kLedMatrix[kMatrixRows][kMatrixCols] 
 {
     // my 5 column config; sparsely maps kLedStripPixelCount to the 8x8 matrix
-    {  0,  1,  2,  3,  4, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    {  5,  6,  7,  8,  9, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { 10, 11, 12, 13, 14, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { 15, kInvalidPixel, kInvalidPixel, 16, 17, 18, kInvalidPixel, kInvalidPixel },
+    { 11, 12, 13, 14, 15, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    { 10,  9,  8,  7,  6, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    {  1,  2,  3,  4,  5, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, 16, kInvalidPixel },
     { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
     { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { 19, 20, 21, 22, 23, 24, 25, 26 }, 
-    { 27, 28, 29, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }
+    { 20, 19, 18, 17, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }, 
+    { 21, 22, 23, 24, kInvalidPixel, kInvalidPixel, kInvalidPixel, 0 }
 
 //  {  0,  1,  2,  3,  4,  5,  6,  7 },
 //  {  8,  9, 10, 11, 12, 13, 14, 15 },
