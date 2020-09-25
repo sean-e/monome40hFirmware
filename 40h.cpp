@@ -93,7 +93,7 @@ bool input_pin(io_pin_t pin)
 }
 
 #if defined(ENABLE_FASTLED) || defined(ENABLE_NEOPIXELBUS)
-const uint16 kLedStripPixelCount = 25;
+const uint16 kLedStripPixelCount = 17;
 const uint8 kLedStripDataPin = 5; // MCU pin 6 / PB5 -> Arduino D5
 // remove max7219 (it was used for SPI LEDs)
 // 3 wire strip connections:
@@ -159,8 +159,10 @@ constexpr uint8 kLedMatrix[kMatrixRows][kMatrixCols]
     { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, 16, kInvalidPixel },
     { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
     { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { 20, 19, 18, 17, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }, 
-    { 21, 22, 23, 24, kInvalidPixel, kInvalidPixel, kInvalidPixel, 0 }
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
+    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }
+//     { 20, 19, 18, 17, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }, 
+//     { 21, 22, 23, 24, kInvalidPixel, kInvalidPixel, kInvalidPixel, 0 }
 
 //  {  0,  1,  2,  3,  4,  5,  6,  7 },
 //  {  8,  9, 10, 11, 12, 13, 14, 15 },
@@ -642,8 +644,7 @@ void
 // recognized pattern values are:
 //   10 : single RGB colors by row
 //   11 : single RGB colors by row then by col
-//   12 : test alternating high / dim values
-//   13 : show preset slot colors
+//   12 : show preset slots (up to kLedStripPixelCount presets if it is less than 32)
 RunPixelTest(PixelStrip &strip, uint8 pattern)
 {
     strip.ClearTo(kOffColor);
@@ -658,13 +659,13 @@ RunPixelTest(PixelStrip &strip, uint8 pattern)
                 uint8 r1 = 0, g1 = 0, b1 = 0;
                 switch (i2)
                 {
-                    case 0:
+                case 0:
                     r1 = hiVal;
                     break;
-                    case 1:
+                case 1:
                     g1 = hiVal;
                     break;
-                    case 2:
+                case 2:
                     b1 = hiVal;
                     break;
                 }
@@ -694,46 +695,7 @@ RunPixelTest(PixelStrip &strip, uint8 pattern)
     }
     else if (12 == pattern)
     {
-        // test various hi vals compared to  dim val
-        for (uint8 i0 = 0; i0 < 5; ++i0)
-        {
-            strip.ClearTo(kOffColor);
-            const uint8 hiVals[]{ 128, 64, 32, 16 };
-            for (uint8 i2 = 0; i2 < 3; ++i2) // iterate over each of the 3 color elements
-            {
-                uint8 r1 = 0, r2 = 0, g1 = 0, g2 = 0, b1 = 0, b2 = 0;
-                for (const auto& hiVal : hiVals) // iterate over the hivals
-                {
-                    switch (i2)
-                    {
-                        case 0:
-                        b1 = hiVal;
-                        b2 = kDimVal;
-                        break;
-                        case 1:
-                        g1 = hiVal;
-                        g2 = kDimVal;
-                        break;
-                        case 2:
-                        r1 = hiVal;
-                        r2 = kDimVal;
-                        break;
-                    }
-
-                    // hiVal - dimVal (repeat)
-                    for (uint8 i3 = 0; i3 < (int)kLedStripPixelCount; i3 += 2)
-                        strip.SetPixelColor(i3, RgbColor{r1, g1, b1});
-                    for (uint8 i3 = 1; i3 < (int)kLedStripPixelCount; i3 += 2)
-                        strip.SetPixelColor(i3, RgbColor{r2, g2, b2});
-                    strip.Show();
-                    delay(2000);
-                }
-            }
-        }
-    }
-    else if (13 == pattern)
-    {
-        // display the preset slots
+        // display the preset slots (up to kLedStripPixelCount presets if it is less than 32)
         uint8 slot = 0;
         for (uint8 i1 = 0; i1 < kMatrixRows; ++i1)
         {
