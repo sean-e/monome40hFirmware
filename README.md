@@ -36,7 +36,7 @@ These commands work as before with the color of the LED taken from preset slot 0
 - kMessageTypeLedSetColumn
 
 This command now accepts a parameter that specifies a particular test pattern:
-- kMessageTypeLedTest                      // 3 test pattern values: 10, 11, 12 (see RunPixelTest in 40h.cpp)
+- kMessageTypeLedTest                      // 2 test pattern values: 10, 11 (see RunPixelTest in 40h.cpp)
 
 These are new commands:
 - kMessageTypeLedRgbOn                     // enable LED using specified RGB value
