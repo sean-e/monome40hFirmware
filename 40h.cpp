@@ -28,12 +28,7 @@
 #include "message.h"
 #include "adc.h"
 #include "button.h"
-
-#if defined(ENABLE_NEOPIXELBUS)
 #include <NeoPixelBus.h>
-#elif defined(ENABLE_FASTLED)
-#include <FastLED.h>
-#endif
 
 struct io_pin_t 
 {
@@ -92,17 +87,15 @@ bool input_pin(io_pin_t pin)
     return 0;
 }
 
-#if defined(ENABLE_FASTLED) || defined(ENABLE_NEOPIXELBUS)
 const uint16 kLedStripPixelCount = 17;
 const uint8 kLedStripDataPin = 5; // MCU pin 6 / PB5 -> Arduino D5
+// Hardware changes to support 3-wire RGB pixel leds:
 // remove max7219 (it was used for SPI LEDs)
 // 3 wire strip connections:
 // data       from max7219 socket pin 1
 // ground     from max7219 socket pin 4
 // vcc        from max7219 socket pin 19 (opposite side of 1, count back from 24)
-#endif
 
-#if defined(ENABLE_NEOPIXELBUS)
 const RgbColor kOffColor{ 0 };
 constexpr uint8 kDimVal = 4;
 constexpr uint8 kPresetCount = 32;
@@ -176,7 +169,6 @@ constexpr uint8 kLedMatrix[kMatrixRows][kMatrixCols]
 
 using PixelStrip = NeoPixelBus<NeoRgbFeature, NeoAvr800KbpsMethod>;
 void RunPixelTest(PixelStrip &strip, uint8 pattern);
-#endif
 
 struct SerialInputData
 {
@@ -249,39 +241,12 @@ struct SerialInputData
 };
 
 
-// #define DEBUG if you're going to debug over JTAG because we'll get caught in one of those
-// while loops otherwise.  I think the JTAG interface must share a pin with the SPI, but I
-// haven't confirmed this.  JAL 5/1/2006
-
-#if defined(ENABLE_LED_SPI)
-inline void spi_led(uint8 msb, uint8 lsb)
-{
-#if !defined(DEBUG)
-    PORTB &= ~(1 << PB4);
-    SPDR = msb;
-    while (!(SPSR & (1 << SPIF)));
-    SPDR = lsb;
-    while (!(SPSR & (1 << SPIF)));
-    PORTB |= (1 << PB4);
-#endif
-}
-#endif
-
 int main(void)
 {
     uint8 i1, i2, i3;
 
     SerialInputData serial_in;
     t_message serial_out;
-
-#if defined(ENABLE_LED_SPI)
-    uint8 led_data[8];
-    uint8 firstRun = true;
-    io_pin_t ioPWREN{ io_pin_t::C, 0 };     // UMR245R PWE#
-    DDRC &= ~(1 << ioPWREN.pin); PORTC |= (1 << ioPWREN.pin);
-#elif defined(ENABLE_FASTLED)
-    CRGB led_data[kLedStripPixelCount];
-#endif
 
     io_pin_t ioRXF{ io_pin_t::B, 1 };         // UMR245R RXF
     io_pin_t ioRD{ io_pin_t::B, 2 };          // UMR245R RD
@@ -307,63 +272,17 @@ int main(void)
 
     output_pin(ioSET, 1);                // clear out row selector
     for (i1 = 0; i1 < 8; i1++) {
-#if defined(ENABLE_LED_SPI)
-        led_data[i1] = 0;
-#endif
         output_pin(ioCLKSEL, 1);         // clear out row selector
         output_pin(ioCLKSEL, 0);
     }
 
     buttonInit();
 
-#if defined(ENABLE_NEOPIXELBUS) || defined(ENABLE_FASTLED)
     init(); // for timer0 init, also calls sei() -- modified version of default Arduino code
-#else
-    sei(); // for ADC
-#endif
 
-#if defined(ENABLE_LED_SPI)
-    // init SPI
-    SPCR = (1 << SPE) | (1 << MSTR) | (SPI2X);
-    DDRB |= (1 << PB5)|(1 << PB4)|(1 << PB7);
-    
-    spi_led(11, 7);                    // set scan limit to full range
-    spi_led(10, 15);                   // set to max intensity
-    for(i1 = 1; i1 < 9; i1++) {
-        spi_led(i1, i1);               // print startup pattern 
-    }
-    spi_led(12, 1);                    // come out of shutdown mode 
-    spi_led(15, 0);                    // test mode off
-   
-    for(i1=0;i1<64;) {
-        spi_led(10, (64-i1)/4);        // set to max intensity
-        if(!input_pin(ioPWREN)) i1++;  // wait for USB enumeration, to prevent auto-sleep
-        _delay_ms(8);
-    }
-
-    for(i1 = 1; i1 < 9; i1++) 
-        spi_led(i1, 0);                // clear led data
- 
-    spi_led(10, 15);                   // set to max intensity
-#elif defined(ENABLE_NEOPIXELBUS)
     PixelStrip strip(kLedStripPixelCount, kLedStripDataPin);
     strip.Begin();
     RunPixelTest(strip, 10);
-#elif defined(ENABLE_FASTLED)
-    for (i1 = 0; i1 < kLedStripPixelCount; i1++)
-        led_data[i1] = CRGB::Black;
-    FastLED.addLeds<NEOPIXEL, kLedStripDataPin>(led_data, kLedStripPixelCount);
-
-    for (i1 = 0; i1 < (int)kLedStripPixelCount; ++i1)
-        led_data[i1] = CRGB::Blue;
-    FastLED.show(); 
-    delay(2000);
-
-    for (i1 = 0; i1 < (int)kLedStripPixelCount; ++i1)
-        led_data[i1] = CRGB::Black;
-    FastLED.Show();
-    delay(2000);
-#endif
 
     // ******** main loop ********
     while (1) 
@@ -387,34 +306,17 @@ int main(void)
                 switch (kMsgType) {
                 case kMessageTypeLedTest:
                     msg_data0 = messageGetLedTestState(serial_in);
-#if defined(ENABLE_LED_SPI)
-                    spi_led(15, msg_data0);
-#elif defined(ENABLE_NEOPIXELBUS)
                     RunPixelTest(strip, msg_data0);
-#endif
                     break;
 
                 case kMessageTypeLedIntensity:
-#if defined(ENABLE_LED_SPI)
-                    msg_data0 = messageGetLedIntensity(serial_in);
-                    spi_led(10, msg_data0);
-#elif defined(ENABLE_NEOPIXELBUS)
-                    // not supported
-#endif
+                    // no longer supported
                     break;
 
                 case kMessageTypeLedStateChange:
                     i1 = messageGetLedX(serial_in);
                     i2 = messageGetLedY(serial_in);
 
-#if defined(ENABLE_LED_SPI)
-                    if(messageGetLedState(serial_in) == 0)
-                        led_data[i2] &= ~(1 << i1);
-                    else
-                        led_data[i2] |= (1 << i1);
-
-                    spi_led(i2 + 1, led_data[i2]);
-#elif defined(ENABLE_NEOPIXELBUS)
                     if (i2 < kMatrixRows && i1 < kMatrixCols)
                     {
                         if(messageGetLedState(serial_in) == 0)
@@ -422,15 +324,8 @@ int main(void)
                         else
                             strip.SetPixelColor(kLedMatrix[i2][i1], gColorPresets[0]);
                     }
-#elif defined(ENABLE_FASTLED)
-                    if(messageGetLedState(serial_in) == 0)
-                        led_data[(i2 * 8) + i1] = CRGB::Black;
-                    else
-                        led_data[(i2 * 8) + i1] = CRGB::Blue;
-#endif
                     break;
 
-#if defined(ENABLE_NEOPIXELBUS)
                 case kMessageTypeLedRgbOn:
                     i1 = messageGetLedX(serial_in);
                     i2 = messageGetLedY(serial_in);
@@ -460,7 +355,6 @@ int main(void)
                     if (i1 < kPresetCount)
                         gColorPresets[i1] = RgbColor{serial_in.data1, serial_in.dataEx[0], serial_in.dataEx[1]};
                     break;
-#endif
 
                 case kMessageTypeAdcEnable:
                     if (messageGetAdcEnableState(serial_in))
@@ -470,63 +364,11 @@ int main(void)
                     break;
 
                 case kMessageTypeShutdown:
-#if defined(ENABLE_LED_SPI)
-                    msg_data0 = messageGetShutdownState(serial_in);
-                    spi_led(12, msg_data0);
-#elif defined(ENABLE_NEOPIXELBUS)
                     strip.ClearTo(kOffColor);
                     strip.Show();
                     delay(500);
-#elif defined(ENABLE_FASTLED)
-                    for (i1 = 0; i1 < kLedStripPixelCount; ++i1)
-                        led_data[i1] = CRGB::Black;
-                    FastLED.show();
-                    delay(500);
-#endif
                     break;
 
-#if defined(ENABLE_LED_SPI)
-                case kMessageTypeLedSetRow:
-                    if (firstRun == true) {
-                        for (i1 = 0; i1 < 8; i1++) {
-                            led_data[i1] = 0;
-                            spi_led(i1 + 1, led_data[i1]);
-                        }
-                        
-                        firstRun = false;
-                    }
-
-                    i1 = (messageGetLedRowIndex(serial_in) & 0x7); // mask this value so we don't write to an invalid address.
-                                                                   // this will have to change for 100h.
-                    i2 = messageGetLedRowState(serial_in);
-                    
-                    led_data[i1] = i2;
-                    spi_led(i1 + 1, led_data[i1]);
-                    break;
-
-                case kMessageTypeLedSetColumn:
-                    if (firstRun == true) {
-                        for (i1 = 0; i1 < 8; i1++) {
-                            led_data[i1] = 0;
-                            spi_led(i1 + 1, led_data[i1]);
-                        }
-                        
-                        firstRun = false;
-                    }
-
-                    i1 = (messageGetLedColumnIndex(serial_in) & 0x7);
-                    i2 = messageGetLedColumnState(serial_in);
-
-                    for (i3 = 0; i3 < 8; i3++) {
-                        if (i2 & (1 << i3))
-                            led_data[i3] |= 1 << i1;
-                        else
-                            led_data[i3] &= ~(1 << i1);
-
-                        spi_led(i3 + 1, led_data[i3]);
-                    }
-                    break;
-#elif defined(ENABLE_NEOPIXELBUS)
                 case kMessageTypeLedSetRow:
                     i1 = (messageGetLedRowIndex(serial_in) & 0x7);
                     i2 = messageGetLedRowState(serial_in);
@@ -554,7 +396,6 @@ int main(void)
                         }
                     }
                     break;
-#endif
                 }
             }
         }
@@ -562,11 +403,7 @@ int main(void)
         // called even if RXF has no data
         serial_in.CheckRoll();
 
-#if defined(ENABLE_NEOPIXELBUS)
         strip.Show();
-#elif defined(ENABLE_FASTLED)
-        FastLED.show();
-#endif
 
 
         // output serial data **********************************************
@@ -639,7 +476,6 @@ int main(void)
     return 0;
 }
 
-#if defined(ENABLE_NEOPIXELBUS)
 void
 // recognized pattern values are:
 //   10 : single RGB colors by row
@@ -715,4 +551,3 @@ RunPixelTest(PixelStrip &strip, uint8 pattern)
     strip.Show();
     delay(250);
 }
-#endif

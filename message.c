@@ -39,12 +39,6 @@ void messagePackLedStateChange(t_message *message, uint8 state, uint8 x, uint8 y
     message->data1 = (x << 4) | y;
 }
 
-void messagePackLedIntensity(t_message *message, uint8 intensity)
-{
-    message->data0 = (kMessageTypeLedIntensity << 4);
-    message->data1 = intensity;
-}
-
 void messagePackLedTest(t_message *message, uint8 state)
 {
     message->data0 = (kMessageTypeLedTest << 4);

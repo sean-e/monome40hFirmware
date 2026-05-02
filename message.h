@@ -39,7 +39,7 @@ typedef enum {
     kMessageTypeButtonPress = 0,
     kMessageTypeAdcVal,
     kMessageTypeLedStateChange,               // uses preset color slot 0
-    kMessageTypeLedIntensity,
+    kMessageTypeLedIntensity,                 // no longer supported, value available for reuse by a new command
     kMessageTypeLedTest,                      // 4 test pattern values: 10, 11, 12, 13 (see RunPixelTest)
     kMessageTypeAdcEnable,
     kMessageTypeShutdown,
@@ -85,7 +85,6 @@ typedef struct {
 void messagePackButtonPress(t_message *message, uint8 state, uint8 x, uint8 y);
 void messagePackAdcVal(t_message *message, uint8 port, uint16 val);
 void messagePackLedStateChange(t_message *message, uint8 state, uint8 x, uint8 y);
-void messagePackLedIntensity(t_message *message, uint8 intensity);
 void messagePackLedTest(t_message *message, uint8 state);
 void messagePackAdcEnable(t_message *message, uint8 adc, uint8 state);
 void messagePackShutdown(t_message *message, uint8 state);
