@@ -87,7 +87,7 @@ bool input_pin(io_pin_t pin)
     return 0;
 }
 
-const uint16 kLedStripPixelCount = 17;
+const uint16 kLedStripPixelCount = 64;
 const uint8 kLedStripDataPin = 5; // MCU pin 6 / PB5 -> Arduino D5
 // Hardware changes to support 3-wire RGB pixel leds:
 // remove max7219 (it was used for SPI LEDs)
@@ -142,29 +142,20 @@ RgbColor gColorPresets[kPresetCount]
 constexpr uint8 kMatrixRows = 8;
 constexpr uint8 kMatrixCols = 8;
 constexpr uint8 kInvalidPixel = -1;
-// map of x/y coordinate to pixel strip ID (x == col, y == row)
-constexpr uint8 kLedMatrix[kMatrixRows][kMatrixCols] 
+// map of x/y coordinate to pixel strip ID (x == col, y == row).
+// Not const because it is expected that the desktop application will
+// update the entire matrix at runtime startup so that different 
+// configurations/layouts can be used without reflashing the firmware.
+uint8 kLedMatrix[kMatrixRows][kMatrixCols]
 {
-    // my 5 column config; sparsely maps kLedStripPixelCount to the 8x8 matrix
-    { 11, 12, 13, 14, 15, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { 10,  9,  8,  7,  6, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    {  1,  2,  3,  4,  5, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, 16, kInvalidPixel },
-    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel },
-    { kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }
-//     { 20, 19, 18, 17, kInvalidPixel, kInvalidPixel, kInvalidPixel, kInvalidPixel }, 
-//     { 21, 22, 23, 24, kInvalidPixel, kInvalidPixel, kInvalidPixel, 0 }
-
-//  {  0,  1,  2,  3,  4,  5,  6,  7 },
-//  {  8,  9, 10, 11, 12, 13, 14, 15 },
-//  { 16, 17, 18, 19, 20, 21, 22, 23 },
-//  { 24, 25, 26, 27, 28, 29, 30, 31 },
-//  { 32, 33, 34, 35, 36, 37, 38, 39 },
-//  { 40, 41, 42, 43, 44, 45, 46, 47 },
-//  { 48, 49, 50, 51, 52, 53, 54, 55 },
-//  { 56, 57, 58, 59, 60, 61, 62, 63 }
+    {  0,  1,  2,  3,  4,  5,  6,  7 },
+    {  8,  9, 10, 11, 12, 13, 14, 15 },
+    { 16, 17, 18, 19, 20, 21, 22, 23 },
+    { 24, 25, 26, 27, 28, 29, 30, 31 },
+    { 32, 33, 34, 35, 36, 37, 38, 39 },
+    { 40, 41, 42, 43, 44, 45, 46, 47 },
+    { 48, 49, 50, 51, 52, 53, 54, 55 },
+    { 56, 57, 58, 59, 60, 61, 62, 63 }
 };
 
 using PixelStrip = NeoPixelBus<NeoRgbFeature, NeoAvr800KbpsMethod>;
@@ -282,7 +273,7 @@ int main(void)
 
     PixelStrip strip(kLedStripPixelCount, kLedStripDataPin);
     strip.Begin();
-    RunPixelTest(strip, 10);
+    RunPixelTest(strip, 9);
 
     // ******** main loop ********
     while (1) 
@@ -309,8 +300,22 @@ int main(void)
                     RunPixelTest(strip, msg_data0);
                     break;
 
-                case kMessageTypeLedIntensity:
-                    // no longer supported
+                case kMessageTypePixelIndexToXY:
+                    // 4 bits message type : 6 bits pixel ID (0-63) : 3 bits X (0-7) : 3 bits Y (0-7)
+                    // 6 bit pixel ID: 4 bits lsb in data0 and 2 bits msb in data1
+                    i1 = (serial_in.data0 & 0xF) | ((serial_in.data1 >> 2) & 0x30); // index
+                    if (i1 >= kLedStripPixelCount)
+						i1 = kInvalidPixel;
+                    i2 = (serial_in.data1 >> 3) & 0x7; // X
+                    i3 = serial_in.data1 & 0x7; // Y
+                    if (i3 < kMatrixRows && i2 < kMatrixCols)
+                        kLedMatrix[i3][i2] = i1;
+                    break;
+
+                case kMessageTypeInvalidateAllPixels:
+                    for (uint8 i1 = 0; i1 < kMatrixRows; ++i1)
+                        for (uint8 i2 = 0; i2 < kMatrixCols; ++i2)
+                            kLedMatrix[i1][i2] = kInvalidPixel;
                     break;
 
                 case kMessageTypeLedStateChange:
@@ -476,18 +481,51 @@ int main(void)
     return 0;
 }
 
-void
 // recognized pattern values are:
+//   09 : single RGB colors for all pixels; power up pattern (runs before pixel IDs have been mapped to XY)
 //   10 : single RGB colors by row
 //   11 : single RGB colors by row then by col
-//   12 : show preset slots (up to kLedStripPixelCount presets if it is less than 32)
+//   12 : show preset slots (limited to lesser of either 32 or actual LED pixels as determined by pixel ID of other than kInvalidPixel)
+void
 RunPixelTest(PixelStrip &strip, uint8 pattern)
 {
     strip.ClearTo(kOffColor);
 
-    if (10 == pattern || 11 == pattern)
+    if (9 == pattern)
     {
-        const uint8 hiVal = 64;
+        // power on startup pattern; all LEDs at once
+        constexpr uint8 hiVal = 64;
+        for (uint8 i2 = 0; i2 < 3; ++i2) // iterate over each of the 3 color elements
+        {
+            uint8 r1 = 0, g1 = 0, b1 = 0;
+            switch (i2)
+            {
+            case 0:
+                r1 = hiVal;
+                break;
+            case 1:
+                g1 = hiVal;
+                break;
+            case 2:
+                b1 = hiVal;
+                break;
+            }
+
+            for (uint8 i1 = 0; i1 < strip.PixelCount(); ++i1)
+            {
+                strip.SetPixelColor(i1, RgbColor{ r1, g1, b1 });
+            }
+
+            strip.Show();
+            delay(750);
+            strip.ClearTo(kOffColor);
+            strip.Show();
+            delay(500);
+        }
+    }
+    else if (10 == pattern || 11 == pattern)
+    {
+        constexpr uint8 hiVal = 64;
         for (uint8 i0 = 0; i0 < (11 == pattern ? 2 : 1); ++i0) // once by rows, once by columns
         {
             for (uint8 i2 = 0; i2 < 3; ++i2) // iterate over each of the 3 color elements
@@ -531,7 +569,8 @@ RunPixelTest(PixelStrip &strip, uint8 pattern)
     }
     else if (12 == pattern)
     {
-        // display the preset slots (up to kLedStripPixelCount presets if it is less than 32)
+        // display the preset slots (limited to lesser of either 32 or actual LED pixels 
+        // as determined by pixel ID of other than kInvalidPixel)
         uint8 slot = 0;
         for (uint8 i1 = 0; i1 < kMatrixRows; ++i1)
         {

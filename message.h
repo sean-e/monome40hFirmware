@@ -39,7 +39,7 @@ typedef enum {
     kMessageTypeButtonPress = 0,
     kMessageTypeAdcVal,
     kMessageTypeLedStateChange,               // uses preset color slot 0
-    kMessageTypeLedIntensity,                 // no longer supported, value available for reuse by a new command
+    kMessageTypePixelIndexToXY,               // assign LED pixel index to X, Y coordinate
     kMessageTypeLedTest,                      // 4 test pattern values: 10, 11, 12, 13 (see RunPixelTest)
     kMessageTypeAdcEnable,
     kMessageTypeShutdown,
@@ -50,6 +50,7 @@ typedef enum {
     kMessageTypeLedOnPresetGroup1,            // enable LED using RGB color slot 0-15
     kMessageTypeUpdatePresetGroup2,           // set preset color slot to specified RGB value (slots 16 - 31 specified as 0 -15)
     kMessageTypeLedOnPresetGroup2,            // enable LED using RGB color slot 16-31 (specified as 0 - 15)
+    kMessageTypeInvalidateAllPixels,          // invalidate all pixel IDs in the matrix
 
     // new message types should require two bytes for type
 
@@ -71,7 +72,6 @@ typedef struct {
 #define messageGetLedState(message)            (message.data0 & 0xF)
 #define messageGetLedX(message)                (message.data1 >> 4)
 #define messageGetLedY(message)                (message.data1 & 0xF)
-#define messageGetLedIntensity(message)        (message.data1)
 #define messageGetLedTestState(message)        (message.data1 & 0xF)
 #define messageGetAdcEnablePort(message)       ((message.data1 & 0xF0) >> 4)
 #define messageGetAdcEnableState(message)      (message.data1 & 0xF)
@@ -89,7 +89,7 @@ void messagePackLedTest(t_message *message, uint8 state);
 void messagePackAdcEnable(t_message *message, uint8 adc, uint8 state);
 void messagePackShutdown(t_message *message, uint8 state);
 void messagePackLedRow(t_message *message, uint8 rowIndex, uint8 state);
-void messagePackLedColumn(t_message *message, uint8 columnIndex, uint8 state);
+void messagePackLedCol(t_message *message, uint8 columnIndex, uint8 state);
 
 #ifdef __cplusplus
 }
