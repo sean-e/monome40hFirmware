@@ -36,6 +36,7 @@ extern "C"
 
 
 typedef enum {
+    // 4 bit message identifiers
     kMessageTypeButtonPress = 0,
     kMessageTypeAdcVal,
     kMessageTypeLedStateChange,               // uses preset color slot 0
@@ -52,7 +53,8 @@ typedef enum {
     kMessageTypeLedOnPresetGroup2,            // enable LED using RGB color slot 16-31 (specified as 0 - 15)
     kMessageTypeInvalidateAllPixels,          // invalidate all pixel IDs in the matrix
 
-    // new message types should require two bytes for type
+    // reserve value 15 to use as marker for 8 bit message identifiers
+    // new message identifiers require whole byte
 
     kMessageNumTypes
 } eMessageTypes;
