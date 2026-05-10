@@ -17,8 +17,6 @@ The submodules directory references https://github.com/sean-e/NeoPixelBus and ht
 - Updated serial protocol to support dynamic LED pixel position configuration (2026)
 
 ## To Use 3-wire RGB NeoPixel LEDs
-- in 40h.cpp, set `kLedStripPixelCount` to the number of LEDs to be used (max 40h)
-- in 40h.cpp, update `kLedMatrix` for your matrix (keep the matrix 8x8, but assign the value `kInvalidPixel` to any position that should be considered empty; in general, the non-invalid values should be in order matching the LED strip order and should not repeat)
 - Remove the MAX7219 IC from the socket on the monome board
 - Compile the source and flash the board
 - Add a jumper between NeoPixel data in and pin 1 of the former MAX7219 socket
