@@ -14,6 +14,7 @@ The submodules directory references https://github.com/sean-e/NeoPixelBus and ht
 - Improved ADC handling for use with expression pedals (2007)
 - Support for 3-wire RGB NeoPixel LEDs (2020)
 - Updated serial protocol for RGB LED support (2020)
+- Updated serial protocol to support dynamic LED pixel position configuration (2026)
 
 ## To Use 3-wire RGB NeoPixel LEDs
 - in 40h.cpp, set `kLedStripPixelCount` to the number of LEDs to be used (max 40h)
@@ -27,7 +28,7 @@ The submodules directory references https://github.com/sean-e/NeoPixelBus and ht
 ## Updated Serial Protocol
 (There are 32 preset color slots which can be changed at runtime.)
 
-This command no longer has any effect:
+This command is removed:
 - kMessageTypeLedIntensity
 
 These commands work as before with the color of the LED taken from preset slot 0:
@@ -44,3 +45,5 @@ These are new commands:
 - kMessageTypeLedOnPresetGroup1            // enable LED using preset color slot 0-15
 - kMessageTypeUpdatePresetGroup2           // set preset color slot to specified RGB value (slots 16 - 31 specified as 0 - 15)
 - kMessageTypeLedOnPresetGroup2            // enable LED using preset color slot 16-31 (specified as 0 - 15)
+- kMessageTypeInvalidateAllPixels          // clear LED pixel matrix
+- kMessageTypePixelIndexToXY               // assign an LED pixel (by ordinal) to position in row/col matrix
